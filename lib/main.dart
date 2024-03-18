@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  runApp(MultiProvider(
-    providers: [
-      ChangeNotifierProvider(create: (context) => ToDoService()),
-    ],
-    child: const MyApp(),
-  ));
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => ToDoService()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -24,118 +26,83 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+/// ToDo 클래스
+class ToDo {
+  String job; // 할 일
+  bool isDone; // 완료 여부
 
-  @override
-  State<HomePage> createState() => _HomePageState();
+  ToDo(this.job, this.isDone); // 생성자
 }
 
-// 상태 클래스
-class _HomePageState extends State<HomePage> {
-  List<ToDo> toDoList = [];
+/// 홈 페이지
+class HomePage extends StatelessWidget {
+  const HomePage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.purple,
-        title: Text(
-          "ToDoList",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: toDoList.isEmpty
-          ? Center(
-              child: Text('To Do List 작성해주세요.'),
-            )
-          : ListView.builder(
-              itemCount: toDoList.length,
-              itemBuilder: (context, index) {
-                ToDo toDo = toDoList[index];
+    return Consumer<ToDoService>(
+      builder: (context, toDoService, child) {
+        // toDoService로 부터 toDoList 가져오기
+        List<ToDo> toDoList = toDoService.toDoList;
 
-                return ListTile(
-                  title: Text(
-                    toDo.job,
-                    style: TextStyle(
-                        fontSize: 20,
-                        color: toDo.isDone ? Colors.grey : Colors.black,
-                        decoration: toDo.isDone
-                            ? TextDecoration.lineThrough
-                            : TextDecoration.none),
-                  ),
-                  trailing: IconButton(
-                      onPressed: () {
-                        showDialog(
-                            context: context,
-                            builder: (context) {
-                              return AlertDialog(
-                                title: Text('삭제 하시겠습니까?'),
-                                actions: [
-                                  // 취소버튼
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                    },
-                                    child: Text(
-                                      '취소',
-                                      style: TextStyle(
-                                        color: Colors.blue,
-                                      ),
-                                    ),
-                                  ),
-                                  // 삭제버튼
-                                  TextButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        toDoList.removeAt(index);
-                                      });
-                                      Navigator.pop(context);
-                                    },
-                                    child: Text(
-                                      '삭제',
-                                      style: TextStyle(
-                                        color: Colors.red,
-                                      ),
-                                    ),
-                                  )
-                                ],
-                              );
-                            });
+        return Scaffold(
+          appBar: AppBar(
+            title: Text("ToDo 리스트"),
+          ),
+          body: toDoList.isEmpty
+              ? Center(
+                  child: Text("To Do List를 작성해주세요"),
+                )
+              : ListView.builder(
+                  itemCount: toDoList.length,
+                  itemBuilder: (context, index) {
+                    ToDo toDo = toDoList[index];
+                    return ListTile(
+                      title: Text(
+                        toDo.job,
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: toDo.isDone ? Colors.grey : Colors.black,
+                          decoration: toDo.isDone
+                              ? TextDecoration.lineThrough
+                              : TextDecoration.none,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(
+                          CupertinoIcons.delete,
+                        ),
+                        onPressed: () {
+                          // 삭제 버튼이 눌렀을 때 적용
+                          toDoService.deleteToDo(index);
+                        },
+                      ),
+                      onTap: () {
+                        // 아이템 클릭시
+                        toDo.isDone = !toDo.isDone;
+                        toDoService.updateToDo(toDo, index);
                       },
-                      icon: Icon(CupertinoIcons.delete)),
-                  onTap: () {
-                    // 아이템 클릭시
-                    setState(() {
-                      toDo.isDone = !toDo.isDone;
-                    });
-                  },
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          String? job = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => CreatePage()),
-          );
-          if (job != null) {
-            setState(() {
-              ToDo newToDo = ToDo(job, false);
-              toDoList.add(newToDo);
-            });
-          }
-        },
-        child: Icon(Icons.add),
-      ),
+                    );
+                  }),
+          floatingActionButton: FloatingActionButton(
+            child: Icon(Icons.add),
+            onPressed: () {
+              // + 버튼 클릭시 ToDo 생성 페이지로 이동
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => CreatePage()),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
 
+/// ToDo 생성 페이지
 class CreatePage extends StatefulWidget {
-  const CreatePage({super.key});
+  const CreatePage({Key? key}) : super(key: key);
 
   @override
   State<CreatePage> createState() => _CreatePageState();
@@ -145,86 +112,72 @@ class _CreatePageState extends State<CreatePage> {
   // TextField의 값을 가져올 때 사용
   TextEditingController textController = TextEditingController();
 
-  // 경고 메시지
+  // 경고 메세지
   String? error;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.purple,
-        title: Text(
-          'ToDoList 작성 페이지',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: Text("ToDo리스트 작성"),
+        // 뒤로가기 버튼
         leading: IconButton(
+          icon: Icon(CupertinoIcons.chevron_back),
           onPressed: () {
-            // 이전 페이지로 이동
             Navigator.pop(context);
           },
-          icon: Icon(CupertinoIcons.chevron_back),
         ),
       ),
-      body: Column(
-        children: [
-          // 텍스트 입력창
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // 텍스트 입력창
+            TextField(
               controller: textController,
-              // 화면이 나왔을경우, 입력창에 커서가 바로 오게 하는 기능
               autofocus: true,
               decoration: InputDecoration(
-                hintText: '할일을 입력하세요.',
+                hintText: "To Do List를 작성해주세요",
                 errorText: error,
               ),
             ),
-          ),
-
-          // Row, Column등에서 widget 사이에 빈 공간을 넣기 위해 사용
-          SizedBox(
-            height: 20,
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: SizedBox(
+            SizedBox(height: 20),
+            // 추가하기 버튼
+            SizedBox(
               width: double.infinity,
               height: 45,
               child: ElevatedButton(
-                onPressed: () {
-                  // 추가하기 버튼을 클릭하면 적용
-                  String toDo = textController.text;
-                  if (toDo.isEmpty) {
-                    setState(() {
-                      error = '내용을 입력해주세요.';
-                    });
-                  } else {
-                    setState(() {
-                      error = null;
-                    });
-                  }
-                  Navigator.pop(context, toDo);
-                },
                 child: Text(
-                  '추가하기',
+                  "추가하기",
                   style: TextStyle(
                     fontSize: 18,
                   ),
                 ),
+                onPressed: () {
+                  // 추가하기 버튼 클릭시
+                  String job = textController.text;
+                  if (job.isEmpty) {
+                    setState(() {
+                      // 내용이 없는 경우 에러 메세지
+                      error = "내용을 입력해주세요.";
+                    });
+                  } else {
+                    setState(() {
+                      // 내용이 있는 경우 에러 메세지 숨김
+                      error = null;
+                    });
+                    // ToDoService 인스턴스 생성
+                    ToDoService toDoService = context.read<ToDoService>();
+                    // ToDoService에 있는 createToDo 메서드 사용
+                    toDoService.createToDo(job);
+                    Navigator.pop(context);
+                  }
+                },
               ),
             ),
-          )
-        ],
+          ],
+        ),
       ),
     );
   }
-}
-
-// ToDo 클래스
-class ToDo {
-  String job;
-  bool isDone;
-
-  ToDo(this.job, this.isDone);
 }
